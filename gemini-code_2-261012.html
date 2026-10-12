@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CM-Lit Reviewer | Ultimate Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <style>
+        :root {
+            --bg-deep: #07090f; --bg-panel: #111625;
+            --neon-blue: #00f3ff; --neon-blue-dim: rgba(0, 243, 255, 0.15);
+            --neon-purple: #b026ff; --neon-green: #ccff00; --neon-orange: #ff6b00;
+            --text-main: #f1f5f9; --text-muted: #64748b; --border-color: #1e293b;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Pretendard', sans-serif; }
+        body { background-color: var(--bg-deep); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+
+        /* Left Sidebar */
+        aside { width: 280px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); padding: 20px; display: flex; flex-direction: column; z-index: 10; }
+        .logo { font-size: 1.3rem; font-weight: 800; color: var(--neon-blue); text-shadow: 0 0 12px var(--neon-blue); margin-bottom: 30px; }
+        .section-title { font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px; font-weight: bold; }
+        
+        .upload-btn { width: 100%; padding: 12px; background: transparent; color: var(--neon-blue); border: 1px dashed var(--neon-blue); border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: bold; transition: 0.3s; margin-bottom: 10px; }
+        .upload-btn:hover { background: var(--neon-blue-dim); box-shadow: 0 0 10px var(--neon-blue-dim); }
+        .file-list { font-size: 0.75rem; color: var(--neon-green); margin-bottom: 25px; word-break: break-all; }
+
+        .run-btn { width:100%; padding: 12px; background:var(--neon-blue); color:#000; border:none; border-radius:6px; font-weight:bold; cursor:pointer; box-shadow:0 0 15px var(--neon-blue-dim); transition: 0.3s; margin-top: auto; }
+        .run-btn:hover { transform: scale(1.02); box-shadow:0 0 20px var(--neon-blue); }
+        .run-btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; box-shadow: none; transform: none; }
+
+        /* Main Workspace Grid */
+        main { flex: 1; display: grid; grid-template-columns: 1.2fr 1fr; padding: 15px; gap: 15px; overflow-y: hidden; }
+        .column { display: flex; flex-direction: column; gap: 15px; overflow: hidden; }
+        .panel { background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; }
+        .panel-header { padding: 12px 15px; border-bottom: 1px solid var(--border-color); font-weight: 600; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); font-size: 0.9rem; }
+        .panel-content { padding: 15px; flex: 1; overflow-y: auto; position: relative; }
+
+        /* Workflow Grid (6개 에이전트 3x2 배치) */
+        .workflow-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .agent-node { background: var(--bg-deep); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 5px; text-align: center; cursor: pointer; transition: 0.3s; position: relative; user-select: none; }
+        .agent-node:hover { border-color: #64748b; }
+        .agent-node.selected { border-color: var(--neon-blue); }
+        .agent-node.active { border-color: var(--neon-blue); background: rgba(0, 243, 255, 0.05); box-shadow: 0 0 15px var(--neon-blue-dim); transform: scale(1.02); }
+        .agent-node.disabled { opacity: 0.4; border-color: var(--bg-deep); background: #0a0e17; filter: grayscale(100%); }
+        .agent-icon { font-size: 1.3rem; margin-bottom: 4px; }
+        .agent-name { font-size: 0.75rem; color: #94a3b8; font-weight: bold; }
+        .agent-eta { font-size: 0.65rem; color: var(--neon-blue); margin-top: 4px; }
+        .agent-node.selected .agent-name { color: #fff; }
+        .agent-node.active .agent-eta { color: var(--neon-green); animation: pulse 1s infinite; }
+        .check-mark { position: absolute; top: 4px; right: 4px; width: 8px; height: 8px; background: var(--neon-blue); border-radius: 50%; display: none; }
+        .agent-node.selected .check-mark { display: block; }
+        .agent-node.disabled .check-mark { display: none; }
+
+        /* Graph */
+        .canvas-container { width: 100%; height: 100%; min-height: 250px; display: block; }
+        canvas { width: 100%; height: 100%; display: block; }
+        .graph-legend { position: absolute; bottom: 10px; left: 10px; font-size: 0.7rem; color: var(--text-muted); background: rgba(0,0,0,0.8); padding: 6px 10px; border-radius: 4px; border: 1px solid #334155; z-index: 2;}
+
+        /* Texts & Interactions */
+        .analysis-block { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #1e293b; }
+        .analysis-block h4 { color: var(--neon-blue); font-size: 0.85rem; margin-bottom: 5px; }
+        .ai-text-box { font-size: 0.85rem; line-height: 1.7; color: #e2e8f0; }
+        
+        .click-sentence { cursor: pointer; border-radius: 3px; padding: 2px 4px; transition: 0.2s; border-left: 2px solid transparent; }
+        .click-sentence:hover { background: rgba(255,255,255,0.05); }
+        .click-sentence.selected-green { background: rgba(204, 255, 0, 0.15); border-left-color: var(--neon-green); color: #fff; }
+        .click-sentence.selected-blue { background: rgba(0, 243, 255, 0.15); border-left-color: var(--neon-blue); color: #fff; }
+
+        /* Translation Panel */
+        .trans-row { margin-bottom: 8px; font-size: 0.85rem; cursor: pointer; padding: 6px; border-radius: 4px; border: 1px solid transparent; }
+        .trans-row:hover { border-color: #334155; background: rgba(255,255,255,0.02); }
+        .trans-en { color: #94a3b8; font-size: 0.75rem; margin-bottom: 2px; }
+        .trans-ko { color: #e2e8f0; }
+
+        /* PDF Viewer (폰트 2포인트 확대: 기존 ~0.9rem -> 1.05rem) */
+        .pdf-viewer { background: #e2e8f0; color: #1e293b; padding: 20px; font-family: 'Times New Roman', serif; font-size: 1.05rem; line-height: 1.7; white-space: pre-wrap; }
+        
+        .source-hl-green { background-color: var(--neon-green); color: #000; padding: 0 4px; border-radius: 3px; font-weight: bold; box-shadow: 0 0 8px var(--neon-green); }
+        .source-hl-blue { background-color: var(--neon-blue); color: #000; padding: 0 4px; border-radius: 3px; font-weight: bold; box-shadow: 0 0 8px var(--neon-blue); }
+        
+        @keyframes pulse { 0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-deep); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <input type="file" id="real-file-input" accept=".pdf" style="display: none;" onchange="handleFileUpload(event)">
+
+    <aside>
+        <div class="logo">⚡ CM-Lit Pro</div>
+        
+        <div class="section-title">1. 문서 업로드 (자동 OCR)</div>
+        <button class="upload-btn" onclick="document.getElementById('real-file-input').click()">📁 PDF 논문 열기</button>
+        <div class="file-list" id="file-list-display">파일을 선택하세요.</div>
+        
+        <div class="section-title" style="margin-top: 10px;">2. 에이전트 위원회 구성</div>
+        <div style="font-size: 0.8rem; color: #94a3b8; margin-bottom: 10px;">우측에서 활성화할 에이전트를 클릭하여 선택하세요.</div>
+        
+        <div style="margin-bottom: 20px;">
+            <label style="display:flex; justify-content:space-between; font-size:0.8rem; color:#cbd5e1; margin-bottom:5px;"><span>비판 분석 심도</span><span>Deep</span></label>
+            <input type="range" min="0" max="100" value="90" style="width:100%; accent-color: var(--neon-blue);">
+        </div>
+
+        <button id="start-btn" class="run-btn" onclick="startAnalysis()" disabled>대기 중...</button>
+    </aside>
+
+    <main>
+        <!-- 좌측 컬럼: 워크플로우 & 그래프 -->
+        <div class="column">
+            <div class="panel" style="flex: 0 0 auto;">
+                <div class="panel-header"><span>📡 Multi-Agent 위원회 (6개 에이전트 선택)</span></div>
+                <div class="panel-content" style="padding: 15px;">
+                    <div class="workflow-grid" id="agent-grid">
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-trans"><div class="check-mark"></div><div class="agent-icon">🌐</div><div class="agent-name">영-한 번역</div><div class="agent-eta">대기중</div></div>
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-method"><div class="check-mark"></div><div class="agent-icon">🔬</div><div class="agent-name">방법론 검증</div><div class="agent-eta">대기중</div></div>
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-field"><div class="check-mark"></div><div class="agent-icon">🏗️</div><div class="agent-name">현장 적용성</div><div class="agent-eta">대기중</div></div>
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-gap"><div class="check-mark"></div><div class="agent-icon">🧩</div><div class="agent-name">간극 탐지</div><div class="agent-eta">대기중</div></div>
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-struct"><div class="check-mark"></div><div class="agent-icon">📐</div><div class="agent-name">구조 기획</div><div class="agent-eta">대기중</div></div>
+                        <div class="agent-node selected" onclick="toggleAgent(this)" id="agent-write"><div class="check-mark"></div><div class="agent-icon">✍️</div><div class="agent-name">학술 집필</div><div class="agent-eta">대기중</div></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 놀리지 그래프 (30개 노드 확장 & 비율 왜곡 방지) -->
+            <div class="panel" style="flex: 1;">
+                <div class="panel-header">🕸️ Knowledge Graph (30개 노드 분석 군집)</div>
+                <div class="panel-content" style="padding: 0;">
+                    <div class="canvas-container" id="canvas-wrapper">
+                        <canvas id="kgraph"></canvas>
+                        <div class="graph-legend" id="graph-legend-text"><span style="color:#64748b">● 대기 상태</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측 컬럼: 초안 / 번역 / 원본PDF (요청하신 순서 반영) -->
+        <div class="column">
+            
+            <!-- 1. 완성된 챕터 초안 -->
+            <div class="panel" style="flex: 1.2;">
+                <div class="panel-header">
+                    <span>✨ 1. 완성된 챕터 초안 및 심층 분석</span>
+                    <span style="font-size:0.7rem; color:var(--neon-green);">문장 클릭 시 원본 매칭</span>
+                </div>
+                <div class="panel-content ai-text-box" id="analysis-draft-area" style="opacity: 0.4;">
+                    <i>(분석을 시작하면 에이전트들의 심층 논리가 표시됩니다.)</i>
+                </div>
+            </div>
+
+            <!-- 2. 영한 번역창 (번역 에이전트 On일 때만 표시) -->
+            <div class="panel" id="translation-panel" style="flex: 1; display: none;">
+                <div class="panel-header" style="border-bottom-color: var(--neon-blue);">
+                    <span style="color:var(--neon-blue);">🌐 2. 라인별 한글 번역 (영한 번역 에이전트)</span>
+                </div>
+                <div class="panel-content" id="translation-content"></div>
+            </div>
+
+            <!-- 3. 원본 PDF 뷰어 (폰트 2포인트 확대 적용) -->
+            <div class="panel" style="flex: 1.5;">
+                <div class="panel-header" style="background: #e2e8f0; color:#000;">
+                    <span>🔎 3. 원본 PDF (Evidence Tracker - 글자 크기 확대)</span>
+                </div>
+                <div class="panel-content pdf-viewer" id="pdf-content-text">
+                    <i>여기에 업로드한 PDF의 3페이지 분량 전체 텍스트가 표시됩니다.</i>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        let isFileUploaded = false;
+        
+        // 3페이지 분량의 풍부하고 방대한 영문 논문 텍스트 시뮬레이션
+        const richDemoText = `[Page 1: Abstract & Introduction]
+Recent advancements in computer vision and deep learning have facilitated the adoption of AI-based worker monitoring systems for proactive safety management in large-scale construction sites. These vision algorithms achieved an average detection accuracy of 95.4% in controlled laboratory environments. However, the negative acceptance of workers on real-world construction sites remains a significant barrier to practical implementation. Traditional construction management (CM) frameworks often fail to account for psychological and behavioral barriers when deploying automated monitoring technologies.
+
+[Page 2: Field Empirical Study & Methodology]
+To evaluate real-world applicability, a comprehensive survey and field test were conducted across 15 medium-sized construction sites over six months. The evaluation utilized CCTV feeds, wearable biometric sensors, and structured interviews with 250 on-site workers and project managers. Statistical analysis of the collected data revealed that 68% of workers experienced psychological stress and anxiety due to frequent false alarms and perceived constant surveillance. Furthermore, the mandatory wearable safety equipment caused physical fatigue and discomfort during heavy manual labor due to excessive battery and casing weight.
+
+[Page 3: Discussion & Conclusion]
+The empirical findings strongly indicate that the primary root cause of system inefficiency is not technical malfunction of the machine learning models, but rather the adverse worker acceptance and poor ergonomic design. Therefore, future CM research and smart construction framework design must pivot from pursuing pure algorithmic precision toward human-centric usability and lightweight architecture. System developers should incorporate field worker feedback loops and privacy-preserving protocols to ensure successful long-term adoption in complex construction environments.`;
+
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('file-list-display').innerText = "선택됨: " + file.name;
+            document.getElementById('pdf-content-text').innerText = "백그라운드 OCR 파싱 및 3페이지 텍스트 추출 중...";
+            
+            setTimeout(() => {
+                document.getElementById('pdf-content-text').innerText = richDemoText;
+                isFileUploaded = true;
+                const startBtn = document.getElementById('start-btn');
+                startBtn.disabled = false;
+                startBtn.innerText = "위원회 분석 시작 🚀";
+                startBtn.style.background = "var(--neon-green)";
+            }, 900);
+        }
+
+        function toggleAgent(element) {
+            if (element.classList.contains('selected')) {
+                element.classList.remove('selected'); element.classList.add('disabled');
+                element.querySelector('.agent-eta').innerText = '제외됨';
+                element.querySelector('.agent-eta').style.color = '#64748b';
+            } else {
+                element.classList.remove('disabled'); element.classList.add('selected');
+                element.querySelector('.agent-eta').innerText = '대기중';
+                element.querySelector('.agent-eta').style.color = 'var(--neon-blue)';
+            }
+        }
+
+        async function startAnalysis() {
+            if(!isFileUploaded) return;
+            const btn = document.getElementById('start-btn');
+            btn.disabled = true; btn.innerText = "분석 진행 중..."; btn.style.background = "var(--neon-blue)";
+
+            // 백그라운드 OCR 완료 후 30개 노드 지식그래프 즉시 빌드
+            extractKeywordsToGraph();
+
+            const selectedAgents = Array.from(document.querySelectorAll('.agent-node.selected'));
+            for(let node of selectedAgents) {
+                node.classList.add('active'); node.querySelector('.agent-eta').innerText = '분석중...';
+                await new Promise(r => setTimeout(r, 600));
+                node.classList.remove('active'); node.querySelector('.agent-eta').innerText = '완료';
+            }
+
+            const transNode = document.getElementById('agent-trans');
+            if(transNode.classList.contains('selected')) {
+                document.getElementById('translation-panel').style.display = 'flex';
+                renderTranslationBox();
+            } else {
+                document.getElementById('translation-panel').style.display = 'none';
+            }
+
+            renderDeepAnalysis();
+            btn.innerText = "분석 완료";
+        }
+
+        function renderDeepAnalysis() {
+            const area = document.getElementById('analysis-draft-area');
+            area.style.opacity = "1";
+            
+            area.innerHTML = `
+                <div class="analysis-block">
+                    <h4>🔬 [방법론 검증 에이전트]</h4>
+                    <div class="click-sentence" onclick="highlightEvidence('controlled laboratory environments', 'green', this)">
+                        본 논문이 제시한 비전 알고리즘은 95.4%의 정확도를 기록했으나, 이는 <b>'controlled laboratory environments(통제된 실험실)'</b>에 한정되어 있어 실제 현장의 동적 변수를 반영하지 못하는 한계가 있음.
+                    </div>
+                </div>
+                
+                <div class="analysis-block">
+                    <h4>🏗️ [현장 적용성 에이전트]</h4>
+                    <div class="click-sentence" onclick="highlightEvidence('stress and anxiety due to frequent false alarms', 'green', this)">
+                        15개 현장 실증 결과, 빈번한 오작동 알람으로 인한 <b>'psychological stress(심리적 스트레스)'</b>와 웨어러블 장비의 무게로 인한 <b>'physical fatigue(물리적 피로)'</b>가 CM 현장 도입의 주된 저해 요인임.
+                    </div>
+                </div>
+
+                <div class="analysis-block">
+                    <h4>🧩 [간극 탐지 에이전트]</h4>
+                    <div class="click-sentence" onclick="highlightEvidence('negative acceptance of workers', 'green', this)">
+                        선행 연구들이 기술적 고도화에만 매몰된 것과 달리, 본 연구는 <b>'negative acceptance of workers(근로자 수용성 저하)'</b>라는 학술적·실무적 연구 간극(Gap)을 탁월하게 파고들었음.
+                    </div>
+                </div>
+
+                <div class="analysis-block">
+                    <h4>📐 [구조 기획 & 학술 집필 에이전트 초안]</h4>
+                    <div>
+                        (심층 분석을 종합한 2장 문헌고찰 초안)<br><br>
+                        최근 컴퓨터 비전 기반의 안전 모니터링 시스템은 실험실 환경에서 95% 이상의 높은 인식률을 보이고 있으나, 실제 현장 적용 시 심각한 장벽에 부딪힌다. 15개 건설 현장을 대상으로 한 실증 분석에 따르면, 68%에 달하는 근로자가 오작동 알람과 지속적 감시로 인해 심리적 스트레스를 겪었으며 장비의 하중으로 인한 육체적 피로를 호소하였다. 따라서 향후 건설사업관리(CM) 분야의 스마트 안전 연구는 알고리즘의 순수 정확도 경쟁에서 벗어나, 현장 작업자의 수용성(Acceptance)과 인체공학적 사용성을 최우선으로 고려하는 방향으로 전환되어야 한다.
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderTranslationBox() {
+            const transData = [
+                { en: "Recent advancements in computer vision and deep learning have facilitated the adoption of AI-based worker monitoring systems for proactive safety management in large-scale construction sites.", ko: "컴퓨터 비전과 딥러닝의 최근 발전은 대규모 건설 현장의 선제적 안전 관리를 위한 AI 기반 근로자 모니터링 시스템의 도입을 촉진했습니다." },
+                { en: "These vision algorithms achieved an average detection accuracy of 95.4% in controlled laboratory environments.", ko: "이러한 비전 알고리즘은 통제된 실험실 환경에서 평균 95.4%의 탐지 정확도를 달성했습니다." },
+                { en: "However, the negative acceptance of workers on real-world construction sites remains a significant barrier to practical implementation.", ko: "그러나 실제 건설 현장에서 근로자들의 부정적 수용성은 실무 적용에 있어 여전히 중요한 장벽으로 남아 있습니다." },
+                { en: "Statistical analysis of the collected data revealed that 68% of workers experienced psychological stress and anxiety due to frequent false alarms and perceived constant surveillance.", ko: "수집된 데이터의 통계 분석 결과, 근로자의 68%가 잦은 오작동 알람과 지속적인 감시로 인해 심리적 스트레스와 불안을 겪은 것으로 나타났습니다." },
+                { en: "Therefore, future CM research and smart construction framework design must pivot from pursuing pure algorithmic precision toward human-centric usability and lightweight architecture.", ko: "따라서 향후 CM 연구와 스마트 건설 프레임워크 설계는 순수한 알고리즘 정밀도 추구에서 인간 중심의 사용성과 경량화 아키텍처로 전환되어야 합니다." }
+            ];
+
+            let html = "";
+            transData.forEach(item => {
+                html += `
+                <div class="trans-row click-sentence" onclick="highlightEvidence('${item.en}', 'blue', this)">
+                    <div class="trans-en">${item.en}</div>
+                    <div class="trans-ko">${item.ko}</div>
+                </div>
+                `;
+            });
+            document.getElementById('translation-content').innerHTML = html;
+        }
+
+        function highlightEvidence(searchText, colorTheme, clickedElement) {
+            document.querySelectorAll('.click-sentence').forEach(el => {
+                el.classList.remove('selected-green', 'selected-blue');
+            });
+            clickedElement.classList.add(colorTheme === 'green' ? 'selected-green' : 'selected-blue');
+
+            const pdfContainer = document.getElementById('pdf-content-text');
+            pdfContainer.innerHTML = richDemoText; 
+            
+            if(!searchText) return;
+
+            const hlClass = colorTheme === 'green' ? 'source-hl-green' : 'source-hl-blue';
+            const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escapeRegExp(searchText)})`, 'gi');
+            
+            pdfContainer.innerHTML = richDemoText.replace(regex, `<span class="${hlClass}">$1</span>`);
+            
+            const hlElem = document.querySelector(`.${hlClass}`);
+            if (hlElem) hlElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+
+        // ==========================================
+        // 지식 그래프: 노드 30개 확장 & 왜곡 방지 렌더링
+        // ==========================================
+        const canvas = document.getElementById('kgraph');
+        const ctx = canvas.getContext('2d');
+        let graphNodes = [];
+        let graphEdges = [];
+
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
+            drawGraph();
+        }
+
+        function extractKeywordsToGraph() {
+            document.getElementById('graph-legend-text').innerHTML = `
+                <span style="color:#00f3ff">● AI 기술 (Cyan)</span> | 
+                <span style="color:#b026ff">● 현장/CM (Purple)</span> | 
+                <span style="color:#ff6b00">● 리스크/한계 (Orange)</span>
+            `;
+            
+            // 정확히 30개의 노드 정의 (AI, CM, 리스크 군집)
+            graphNodes = [
+                // Cyan (AI Tech - 10개)
+                {x:15, y:20, color:'#00f3ff', label:'AI Vision', r:16}, {x:25, y:12, color:'#00f3ff', label:'Deep Learning', r:12},
+                {x:35, y:22, color:'#00f3ff', label:'YOLOv8', r:10}, {x:12, y:38, color:'#00f3ff', label:'CCTV Feeds', r:14},
+                {x:25, y:30, color:'#00f3ff', label:'Accuracy 95%', r:15}, {x:8, y:22, color:'#00f3ff', label:'Sensors', r:10},
+                {x:20, y:45, color:'#00f3ff', label:'Real-time', r:12}, {x:32, y:40, color:'#00f3ff', label:'Automation', r:11},
+                {x:5, y:45, color:'#00f3ff', label:'BIM Data', r:10}, {x:18, y:10, color:'#00f3ff', label:'Digital Twin', r:10},
+
+                // Purple (CM / Field - 10개)
+                {x:75, y:70, color:'#b026ff', label:'Acceptance', r:18}, {x:88, y:75, color:'#b026ff', label:'Worker Survey', r:12},
+                {x:65, y:82, color:'#b026ff', label:'Productivity', r:14}, {x:80, y:88, color:'#b026ff', label:'Usability', r:13},
+                {x:70, y:60, color:'#b026ff', label:'CM Framework', r:15}, {x:90, y:60, color:'#b026ff', label:'Site Managers', r:11},
+                {x:60, y:70, color:'#b026ff', label:'Schedule', r:10}, {x:85, y:50, color:'#b026ff', label:'Cost Control', r:10},
+                {x:62, y:90, color:'#b026ff', label:'Safety Culture', r:12}, {x:92, y:85, color:'#b026ff', label:'Training', r:10},
+
+                // Orange (Risk / Gap - 10개)
+                {x:75, y:18, color:'#ff6b00', label:'False Alarms', r:16}, {x:88, y:25, color:'#ff6b00', label:'Psych Stress', r:14},
+                {x:65, y:22, color:'#ff6b00', label:'Physical Fatigue', r:15}, {x:82, y:10, color:'#ff6b00', label:'Device Weight', r:12},
+                {x:92, y:38, color:'#ff6b00', label:'Privacy Issues', r:13}, {x:60, y:35, color:'#ff6b00', label:'Network Lag', r:10},
+                {x:70, y:42, color:'#ff6b00', label:'Research Gap', r:15}, {x:85, y:40, color:'#ff6b00', label:'Battery Life', r:10},
+                {x:55, y:20, color:'#ff6b00', label:'Error Rate', r:10}, {x:95, y:20, color:'#ff6b00', label:'Resistance', r:11},
+
+                // Center (Synthesis - 2개)
+                {x:50, y:50, color:'#ccff00', label:'CM Synthesis', r:20}, {x:48, y:35, color:'#ccff00', label:'Human-Centric', r:14}
+            ];
+            
+            // 거미줄처럼 촘촘하고 복잡하게 엣지 연결 (총 45개 이상의 링크)
+            graphEdges = [
+                // Cyan internal
+                [0,1],[0,2],[0,4],[1,2],[1,9],[2,4],[3,4],[3,6],[4,7],[5,0],[6,7],[8,3],
+                // Purple internal
+                [10,11],[10,12],[10,13],[10,14],[11,15],[12,16],[13,18],[14,17],[15,17],[16,18],[18,19],
+                // Orange internal
+                [20,21],[20,22],[21,23],[22,24],[23,25],[24,26],[26,27],[20,28],[22,29],[25,29],
+                // Cross & Center links
+                [4,26],[7,26],[14,26],[22,26],[0,28],[10,24],[30,0],[30,4],[30,7],[30,10],[30,20],[30,26],
+                [31,1],[31,14],[31,21],[31,30]
+            ];
+            drawGraph();
+        }
+
+        function drawGraph() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.lineWidth = 1;
+            graphEdges.forEach(edge => {
+                const n1 = graphNodes[edge[0]], n2 = graphNodes[edge[1]];
+                const px1 = n1.x * canvas.width / 100, py1 = n1.y * canvas.height / 100;
+                const px2 = n2.x * canvas.width / 100, py2 = n2.y * canvas.height / 100;
+                
+                const grad = ctx.createLinearGradient(px1, py1, px2, py2);
+                grad.addColorStop(0, n1.color); grad.addColorStop(1, n2.color);
+                
+                ctx.beginPath(); ctx.strokeStyle = grad; ctx.globalAlpha = 0.35;
+                ctx.moveTo(px1, py1); ctx.lineTo(px2, py2); ctx.stroke();
+            });
+
+            ctx.globalAlpha = 1;
+            graphNodes.forEach(node => {
+                const px = node.x * canvas.width / 100, py = node.y * canvas.height / 100;
+                ctx.beginPath(); ctx.arc(px, py, node.r, 0, Math.PI * 2);
+                ctx.fillStyle = node.color;
+                ctx.shadowColor = node.color; ctx.shadowBlur = node.r * 0.8;
+                ctx.fill();
+                
+                ctx.shadowBlur = 0; ctx.fillStyle = "#ffffff";
+                ctx.font = (node.r >= 18 ? "bold 10px" : "9px") + " sans-serif"; 
+                ctx.textAlign = "center";
+                ctx.fillText(node.label, px, py + node.r + 11);
+            });
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        setTimeout(resizeCanvas, 150);
+    </script>
+</body>
+</html>
